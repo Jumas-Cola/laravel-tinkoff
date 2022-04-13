@@ -1,12 +1,12 @@
 {
-    "name": "kenvel/laravel-tinkoff",
+    "name": "jumas-cola/laravel-tinkoff",
     "type": "library",
     "description": "Simple Tinkoff bank acquiring library.",
     "keywords": [
         "tinkoff",
         "acquiring"
     ],
-    "homepage": "https://github.com/kenvel/laravel-tinkoff",
+    "homepage": "https://github.com/jumas-cola/laravel-tinkoff",
     "license": "MIT",
     "authors": [
         {

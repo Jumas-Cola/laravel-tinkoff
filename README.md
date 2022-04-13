@@ -13,8 +13,10 @@
 С помощью [Composer](https://getcomposer.org/):
 
 ```bash
-composer require kenvel/laravel-tinkoff
+composer require jumas-cola/laravel-tinkoff
 ```
+
+Форк библиотеки kenvel/laravel-tinkoff
 
 Подключение в контроллере:
 
@@ -82,7 +84,7 @@ if(!$status){
 
 ### 4. Отмена платежа
 ```php
-$status = $tinkoff->cencelPayment($payment_id)
+$status = $tinkoff->cancelPayment($payment_id)
 
 //Контроль ошибок
 if(!$status){

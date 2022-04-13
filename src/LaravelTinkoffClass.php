@@ -31,6 +31,21 @@ class LaravelTinkoffClass
     protected $payment_url;
     protected $payment_status;
 
+    protected const OPTIONAL_FIELDS = [
+        "IP",
+        "Description",
+        "Currency",
+        "PayType",
+        "Language",
+        "NotificationURL",
+        "SuccessURL",
+        "FailURL",
+        "RedirectDueDate",
+        "Shops",
+        "Receipts",
+        "Descriptor",
+    ];
+
     /**
      * Inicialize LaravelTinkoffClass class
      *
@@ -96,8 +111,6 @@ class LaravelTinkoffClass
         $params = [
             "OrderId" => $payment["OrderId"],
             "Amount" => round($payment["Amount"] * $amount_multiplicator),
-            "Language" => $payment["Language"],
-            "Description" => $payment["Description"],
             "DATA" => [
                 "Email" => $payment["Email"],
                 "Phone" => $payment["Phone"],
@@ -110,6 +123,14 @@ class LaravelTinkoffClass
                 "Items" => $payment["Items"],
             ],
         ];
+
+        foreach (self::OPTIONAL_FIELDS as $field) {
+            if (
+                array_key_exists($field, $payment) and !empty($payment[$field])
+            ) {
+                $params[$field] = $payment[$field];
+            }
+        }
 
         if ($this->sendRequest($this->url_init, $params)) {
             return $this->payment_url;
@@ -318,8 +339,6 @@ class LaravelTinkoffClass
         $keys = [
             "OrderId",
             "Amount",
-            "Language",
-            "Description",
             "Email",
             "Phone",
             "Name",

@@ -176,11 +176,12 @@ class LaravelTinkoffClass
     }
 
     /**
-     * Validate request
+     * Validate notification request
      *
+     * @param  [array] Tinkoff notification request data
      * @return boolean
      */
-    public function checkRequest($request_data)
+    public function checkNotification($request_data)
     {
         $args_token = $request_data['Token'];
 

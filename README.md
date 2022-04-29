@@ -25,14 +25,13 @@ use Kenvel\Tinkoff;
 ```
 
 ## Примеры использования
-### 1. Инициализация
+### 1. Настройка
 
+Добавить в файл .env и опубликовать конфигурацию через php artisan vendor:publish:
 ```php
-$api_url    = 'https://securepay.tinkoff.ru/v2/';
-$terminal   = '152619634343';
-$secret_key = 'terminal_secret_password';
-
-$tinkoff = new Tinkoff($api_url, $terminal, $secret_key);
+#Tinkoff
+TINKOFF_TERMINAL_ID=1111111111111DEMO
+TINKOFF_SECRET_KEY=xxxxxxxxxxxxxxxx
 ```
 
 ### 2. Получить URL для оплаты
@@ -57,53 +56,29 @@ $items[] = [
 ];
 
 //Получение url для оплаты
-$paymentURL = $tinkoff->paymentURL($payment, $items);
-
-//Контроль ошибок
-if(!$paymentURL){
-  echo($tinkoff->error);
-} else {
-  $payment_id = $tinkoff->payment_id;
-  return redirect($result['payment_url']);
-}
+$paymentURL = Tinkoff::paymentURL($payment, $items);
 ```
 
 ### 3. Получить статус платежа
 ```php
 //$payment_id Идентификатор платежа банка (полученый в пункте "2 Получить URL для оплаты")
 
-$status = $tinkoff->getState($payment_id)
-
-//Контроль ошибок
-if(!$status){
-  echo($tinkoff->error);
-} else {
-  echo($status);
-}
+$status = Tinkoff::getState($payment_id)
 ```
 
 ### 4. Отмена платежа
 ```php
-$status = $tinkoff->cancelPayment($payment_id)
-
-//Контроль ошибок
-if(!$status){
-  echo($tinkoff->error);
-} else {
-  echo($status);
-}
+$status = Tinkoff::cancelPayment($payment_id)
 ```
 
 ### 5. Подтверждение платежа
 ```php
-$status = $tinkoff->confirmPayment($payment_id)
+$status = Tinkoff::confirmPayment($payment_id)
+```
 
-//Контроль ошибок
-if(!$status){
-  echo($tinkoff->error);
-} else {
-  echo($status);
-}
+### 6. Проверка нотификации со стстусом платежа
+```php
+$is_valid = Tinkoff::checkNotification($request->all())
 ```
 
 ---

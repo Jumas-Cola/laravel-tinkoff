@@ -11,6 +11,12 @@
             "email": "dimult@yahoo.com",
             "homepage": "https://github.com/kenvel/",
             "role": "Developer"
+        },
+        {
+            "name": "Daniil Mukhanov",
+            "email": "kbbyfl91@gmail.com",
+            "homepage": "https://github.com/jumas-cola/",
+            "role": "Developer"
         }
     ],
     "require": {

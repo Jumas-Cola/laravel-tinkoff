@@ -13,6 +13,8 @@
 
 namespace Kenvel;
 
+use Illuminate\Support\Facades\Http;
+
 class LaravelTinkoffClass
 {
     private $acquiring_url;
@@ -32,18 +34,18 @@ class LaravelTinkoffClass
     protected $payment_status;
 
     protected const OPTIONAL_FIELDS = [
-        "IP",
-        "Description",
-        "Currency",
-        "PayType",
-        "Language",
-        "NotificationURL",
-        "SuccessURL",
-        "FailURL",
-        "RedirectDueDate",
-        "Shops",
-        "Receipts",
-        "Descriptor",
+        'IP',
+        'Description',
+        'Currency',
+        'PayType',
+        'Language',
+        'NotificationURL',
+        'SuccessURL',
+        'FailURL',
+        'RedirectDueDate',
+        'Shops',
+        'Receipts',
+        'Descriptor',
     ];
 
     /**
@@ -52,9 +54,9 @@ class LaravelTinkoffClass
      */
     public function __construct()
     {
-        $this->acquiring_url = config("tinkoff.acquiring_url");
-        $this->terminal_id = config("tinkoff.terminal_id");
-        $this->secret_key = config("tinkoff.secret_key");
+        $this->acquiring_url = config('tinkoff.acquiring_url');
+        $this->terminal_id = config('tinkoff.terminal_id');
+        $this->secret_key = config('tinkoff.secret_key');
         $this->setupUrls();
     }
 
@@ -76,7 +78,7 @@ class LaravelTinkoffClass
     public function paymentURL(array $payment, array $items)
     {
         if (!$this->paymentArrayChecked($payment)) {
-            $this->error = "Incomplete payment data";
+            $this->error = 'Incomplete payment data';
             return false;
         }
 
@@ -88,39 +90,39 @@ class LaravelTinkoffClass
          */
         foreach ($items as $item) {
             if (!$this->itemsArrayChecked($item)) {
-                $this->error = "Incomplete items data";
+                $this->error = 'Incomplete items data';
                 return false;
             }
 
-            $payment["Items"][] = [
-                "Name" => mb_strimwidth(
-                    $item["Name"],
+            $payment['Items'][] = [
+                'Name' => mb_strimwidth(
+                    $item['Name'],
                     0,
                     $item_name_max_lenght - 1,
-                    ""
+                    ''
                 ),
-                "Price" => round($item["Price"] * $amount_multiplicator),
-                "Quantity" => $item["Quantity"],
-                "Amount" => round(
-                    $item["Price"] * $item["Quantity"] * $amount_multiplicator
+                'Price' => round($item['Price'] * $amount_multiplicator),
+                'Quantity' => $item['Quantity'],
+                'Amount' => round(
+                    $item['Price'] * $item['Quantity'] * $amount_multiplicator
                 ),
-                "Tax" => $item["NDS"],
+                'Tax' => $item['NDS'],
             ];
         }
 
         $params = [
-            "OrderId" => $payment["OrderId"],
-            "Amount" => round($payment["Amount"] * $amount_multiplicator),
-            "DATA" => [
-                "Email" => $payment["Email"],
-                "Phone" => $payment["Phone"],
-                "Name" => $payment["Name"],
+            'OrderId' => $payment['OrderId'],
+            'Amount' => round($payment['Amount'] * $amount_multiplicator),
+            'DATA' => [
+                'Email' => $payment['Email'],
+                'Phone' => $payment['Phone'],
+                'Name' => $payment['Name'],
             ],
-            "Receipt" => [
-                "Email" => $payment["Email"],
-                "Phone" => $payment["Phone"],
-                "Taxation" => $payment["Taxation"],
-                "Items" => $payment["Items"],
+            'Receipt' => [
+                'Email' => $payment['Email'],
+                'Phone' => $payment['Phone'],
+                'Taxation' => $payment['Taxation'],
+                'Items' => $payment['Items'],
             ],
         ];
 
@@ -147,7 +149,7 @@ class LaravelTinkoffClass
      */
     public function getState($payment_id)
     {
-        $params = ["PaymentId" => $payment_id];
+        $params = ['PaymentId' => $payment_id];
 
         if ($this->sendRequest($this->url_get_state, $params)) {
             return $this->payment_status;
@@ -164,13 +166,26 @@ class LaravelTinkoffClass
      */
     public function confirmPayment($payment_id)
     {
-        $params = ["PaymentId" => $payment_id];
+        $params = ['PaymentId' => $payment_id];
 
         if ($this->sendRequest($this->url_confirm, $params)) {
             return $this->payment_status;
         }
 
         return false;
+    }
+
+    /**
+     * Validate request
+     *
+     * @return boolean
+     */
+    public function checkRequest($request_data)
+    {
+        $args_token = $request_data['Token'];
+
+        return isset($args_token) and
+            $args_token == self::generateToken($request_data);
     }
 
     /**
@@ -181,7 +196,7 @@ class LaravelTinkoffClass
      */
     public function cancelPayment($payment_id)
     {
-        $params = ["PaymentId" => $payment_id];
+        $params = ['PaymentId' => $payment_id];
 
         if ($this->sendRequest($this->url_cancel, $params)) {
             return $this->payment_status;
@@ -199,45 +214,27 @@ class LaravelTinkoffClass
      */
     private function sendRequest($path, array $args)
     {
-        $args["TerminalKey"] = $this->terminal_id;
-        $args["Token"] = $this->generateToken($args);
-        $args = json_encode($args);
+        $args['TerminalKey'] = $this->terminal_id;
+        $args['Token'] = $this->generateToken($args);
 
-        if ($curl = curl_init()) {
-            curl_setopt($curl, CURLOPT_URL, $path);
-            curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($curl, CURLOPT_POST, true);
-            curl_setopt($curl, CURLOPT_POSTFIELDS, $args);
-            curl_setopt($curl, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/json",
-            ]);
+        $response = Http::retry(5, 100)->post($path, $args);
 
-            $response = curl_exec($curl);
-            curl_close($curl);
+        $json = json_decode($response->body());
 
-            $this->response = $response;
-            $json = json_decode($response);
+        if ($json) {
+            if ($this->errorsFound()) {
+                return false;
+            } else {
+                $this->payment_id = @$json->PaymentId;
+                $this->payment_url = @$json->PaymentURL;
+                $this->payment_status = @$json->Status;
 
-            if ($json) {
-                if ($this->errorsFound()) {
-                    return false;
-                } else {
-                    $this->payment_id = @$json->PaymentId;
-                    $this->payment_url = @$json->PaymentURL;
-                    $this->payment_status = @$json->Status;
-
-                    return true;
-                }
+                return true;
             }
-
-            $this->error .= "Can't create connection to: $path | with args: $args";
-            return false;
-        } else {
-            $this->error .= "CURL init filed: $path | with args: $args";
-            return false;
         }
+
+        $this->error .= "Can't create connection to: $path | with args: $args";
+        return false;
     }
 
     /**
@@ -248,31 +245,31 @@ class LaravelTinkoffClass
     {
         $response = json_decode($this->response, true);
 
-        if (isset($response["ErrorCode"])) {
-            $error_code = (int) $response["ErrorCode"];
+        if (isset($response['ErrorCode'])) {
+            $error_code = (int) $response['ErrorCode'];
         } else {
             $error_code = 0;
         }
 
-        if (isset($response["Message"])) {
-            $error_msg = $response["Message"];
+        if (isset($response['Message'])) {
+            $error_msg = $response['Message'];
         } else {
-            $error_msg = "Unknown error.";
+            $error_msg = 'Unknown error.';
         }
 
-        if (isset($response["Details"])) {
-            $error_message = $response["Details"];
+        if (isset($response['Details'])) {
+            $error_message = $response['Details'];
         } else {
-            $error_message = "Unknown error.";
+            $error_message = 'Unknown error.';
         }
 
         if ($error_code !== 0) {
             $this->error =
-                "Error code: " .
+                'Error code: ' .
                 $error_code .
-                " | Msg: " .
+                ' | Msg: ' .
                 $error_msg .
-                " | Message: " .
+                ' | Message: ' .
                 $error_message;
             return true;
         }
@@ -287,18 +284,22 @@ class LaravelTinkoffClass
      */
     private function generateToken(array $args)
     {
-        $token = "";
-        $args["Password"] = $this->secret_key;
-        $args["TerminalKey"] = $this->terminal_id;
+        $token = '';
+        $args['Password'] = $this->secret_key;
+        $args['TerminalKey'] = $this->terminal_id;
         ksort($args);
 
-        foreach ($args as $arg) {
-            if (!is_array($arg)) {
-                $token .= $arg;
+        foreach ($args as $key => $arg) {
+            if (!is_array($arg) && $key != 'Token') {
+                if (is_bool($arg)) {
+                    $token .= $arg ? 'true' : 'false';
+                } else {
+                    $token .= $arg;
+                }
             }
         }
 
-        return hash("sha256", $token);
+        return hash('sha256', $token);
     }
 
     /**
@@ -309,10 +310,10 @@ class LaravelTinkoffClass
     private function setupUrls()
     {
         $this->acquiring_url = $this->checkSlashOnUrlEnd($this->acquiring_url);
-        $this->url_init = $this->acquiring_url . "Init/";
-        $this->url_cancel = $this->acquiring_url . "Cancel/";
-        $this->url_confirm = $this->acquiring_url . "Confirm/";
-        $this->url_get_state = $this->acquiring_url . "GetState/";
+        $this->url_init = $this->acquiring_url . 'Init/';
+        $this->url_cancel = $this->acquiring_url . 'Cancel/';
+        $this->url_confirm = $this->acquiring_url . 'Confirm/';
+        $this->url_get_state = $this->acquiring_url . 'GetState/';
     }
 
     /**
@@ -322,8 +323,8 @@ class LaravelTinkoffClass
      */
     private function checkSlashOnUrlEnd($url)
     {
-        if ($url[strlen($url) - 1] !== "/") {
-            $url .= "/";
+        if ($url[strlen($url) - 1] !== '/') {
+            $url .= '/';
         }
         return $url;
     }
@@ -337,14 +338,14 @@ class LaravelTinkoffClass
     private function paymentArrayChecked(array $array_for_check)
     {
         $keys = [
-            "OrderId",
-            "Amount",
-            "Email",
-            "Phone",
-            "Name",
-            "Email",
-            "Phone",
-            "Taxation",
+            'OrderId',
+            'Amount',
+            'Email',
+            'Phone',
+            'Name',
+            'Email',
+            'Phone',
+            'Taxation',
         ];
         return $this->allKeysIsExistInArray($keys, $array_for_check);
     }
@@ -357,7 +358,7 @@ class LaravelTinkoffClass
      */
     private function itemsArrayChecked(array $array_for_check)
     {
-        $keys = ["Name", "Price", "NDS", "Quantity"];
+        $keys = ['Name', 'Price', 'NDS', 'Quantity'];
         return $this->allKeysIsExistInArray($keys, $array_for_check);
     }
 

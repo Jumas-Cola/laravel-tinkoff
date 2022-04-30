@@ -14,6 +14,9 @@
 namespace Kenvel;
 
 use Illuminate\Support\Facades\Http;
+use Kenvel\Exceptions\HttpException;
+use Kenvel\Exceptions\PaymentDataException;
+use Kenvel\Exceptions\PaymentItemException;
 
 class LaravelTinkoffClass
 {
@@ -26,7 +29,6 @@ class LaravelTinkoffClass
     private $url_confirm;
     private $url_get_state;
 
-    protected $error;
     protected $response;
 
     protected $payment_id;
@@ -78,8 +80,7 @@ class LaravelTinkoffClass
     public function paymentURL(array $payment, array $items)
     {
         if (!$this->paymentArrayChecked($payment)) {
-            $this->error = 'Incomplete payment data';
-            return false;
+            throw new PaymentDataException('Incomplete payment data.');
         }
 
         $item_name_max_lenght = 64;
@@ -90,8 +91,7 @@ class LaravelTinkoffClass
          */
         foreach ($items as $item) {
             if (!$this->itemsArrayChecked($item)) {
-                $this->error = 'Incomplete items data';
-                return false;
+                throw new PaymentItemException('Incomplete items data.');
             }
 
             $payment['Items'][] = [
@@ -134,11 +134,9 @@ class LaravelTinkoffClass
             }
         }
 
-        if ($this->sendRequest($this->url_init, $params)) {
-            return $this->payment_url;
-        }
+        $this->sendRequest($this->url_init, $params);
 
-        return false;
+        return $this->payment_url;
     }
 
     /**
@@ -151,11 +149,9 @@ class LaravelTinkoffClass
     {
         $params = ['PaymentId' => $payment_id];
 
-        if ($this->sendRequest($this->url_get_state, $params)) {
-            return $this->payment_status;
-        }
+        $this->sendRequest($this->url_get_state, $params);
 
-        return false;
+        return $this->payment_status;
     }
 
     /**
@@ -168,11 +164,24 @@ class LaravelTinkoffClass
     {
         $params = ['PaymentId' => $payment_id];
 
-        if ($this->sendRequest($this->url_confirm, $params)) {
-            return $this->payment_status;
-        }
+        $this->sendRequest($this->url_confirm, $params);
 
-        return false;
+        return $this->payment_status;
+    }
+
+    /**
+     * Cancel payment
+     *
+     * @param  [string] Tinkoff payment id
+     * @return [mixed] status of payment or false
+     */
+    public function cancelPayment($payment_id)
+    {
+        $params = ['PaymentId' => $payment_id];
+
+        $this->sendRequest($this->url_cancel, $params);
+
+        return $this->payment_status;
     }
 
     /**
@@ -187,23 +196,6 @@ class LaravelTinkoffClass
 
         return isset($args_token) and
             $args_token == self::generateToken($request_data);
-    }
-
-    /**
-     * Cancel payment
-     *
-     * @param  [string] Tinkoff payment id
-     * @return [mixed] status of payment or false
-     */
-    public function cancelPayment($payment_id)
-    {
-        $params = ['PaymentId' => $payment_id];
-
-        if ($this->sendRequest($this->url_cancel, $params)) {
-            return $this->payment_status;
-        }
-
-        return false;
     }
 
     /**
@@ -222,59 +214,11 @@ class LaravelTinkoffClass
 
         $json = json_decode($response->body());
 
-        if ($json) {
-            if ($this->errorsFound()) {
-                return false;
-            } else {
-                $this->payment_id = @$json->PaymentId;
-                $this->payment_url = @$json->PaymentURL;
-                $this->payment_status = @$json->Status;
+        $this->payment_id = @$json->PaymentId;
+        $this->payment_url = @$json->PaymentURL;
+        $this->payment_status = @$json->Status;
 
-                return true;
-            }
-        }
-
-        $this->error .= "Can't create connection to: $path | with args: $args";
-        return false;
-    }
-
-    /**
-     * Finding all possible errors
-     * @return bool
-     */
-    private function errorsFound(): bool
-    {
-        $response = json_decode($this->response, true);
-
-        if (isset($response['ErrorCode'])) {
-            $error_code = (int) $response['ErrorCode'];
-        } else {
-            $error_code = 0;
-        }
-
-        if (isset($response['Message'])) {
-            $error_msg = $response['Message'];
-        } else {
-            $error_msg = 'Unknown error.';
-        }
-
-        if (isset($response['Details'])) {
-            $error_message = $response['Details'];
-        } else {
-            $error_message = 'Unknown error.';
-        }
-
-        if ($error_code !== 0) {
-            $this->error =
-                'Error code: ' .
-                $error_code .
-                ' | Msg: ' .
-                $error_msg .
-                ' | Message: ' .
-                $error_message;
-            return true;
-        }
-        return false;
+        return true;
     }
 
     /**

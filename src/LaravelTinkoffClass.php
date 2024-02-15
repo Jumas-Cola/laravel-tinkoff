@@ -136,7 +136,7 @@ class LaravelTinkoffClass
 
         $this->sendRequest($this->url_init, $params);
 
-        return $this->payment_url;
+        return ['url' => $this->payment_url, 'payment_id' => $this->payment_id];
     }
 
     /**
